@@ -46,10 +46,6 @@ This project is a comprehensive solution for managing event participation using 
 - **Admin Dashboard:** Access the dashboard to monitor participant check-ins, view statistics, and manage services.
 - **Participant Interface:** Participants can scan their QR codes on the day of the event to check-in and avail of services.
 
-## Project Structure
-event-qr-system/ │ ├── app/ │ ├── static/ # Static files (CSS, JS, images) │ ├── templates/ # HTML templates │ ├── qr_codes/ # Generated QR codes (ignored in Git) │ ├── coupons/ # Generated coupons (ignored in Git) │ ├── routes.py # Flask routes │ ├── models.py # Database models │ ├── utils.py # Utility functions (QR code generation, email sending) │ └── init.py # Flask application instance │ ├── .env # Environment variables (ignored in Git) ├── requirements.txt # Python dependencies ├── README.md # Project documentation └── .gitignore # Git ignore file
-
-
 ## Contributing
 
 Contributions are welcome! Feel free to submit a pull request or open an issue to discuss your ideas.
