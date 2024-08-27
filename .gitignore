@@ -1,0 +1,4 @@
+.env
+qr_codes/
+coupons/
+credentials.json

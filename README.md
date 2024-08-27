@@ -1,0 +1,2 @@
+# event_qr_system
+ This project is designed to streamline event check-ins and service access using QR codes. Whether you're managing a small gathering or a large-scale event, this system simplifies participant tracking and service verification.  With an intuitive interface, participants can easily scan their QR codes to gain access to services, making the process both quick and seamless. The system is versatile, accommodating different event types and sizes, and is built to handle various scenarios from entry management to on-site service distribution.

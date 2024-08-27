@@ -1,0 +1,294 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Aavesham'24</title>
+    <link rel="icon" href="images\aavesham.svg" type="image/svg+xml">
+    <link rel="shortcut icon" href="images\aavesham.svg" type="image/svg+xml">
+    <script src="https://cdn.jsdelivr.net/npm/jsqr@1.3.1/dist/jsQR.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.3/js/all.min.js"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Julius+Sans+One&family=Noto+Serif+Malayalam:wght@700&display=swap');
+        
+        body {
+            font-family: 'Noto Serif Malayalam', serif;
+            background: linear-gradient(135deg, #FFB74D 0%, #FF8A65 100%);
+            margin: 0;
+            padding: 0;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            background-size: cover;
+            background-repeat: no-repeat;
+            background-attachment: fixed;
+        }
+
+        .wrapper {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            max-width: 1200px;
+            width: 100%;
+            height: 90vh; 
+            padding: 0 20px; 
+            box-sizing: border-box;
+        }
+
+        .scanner-container {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            align-items: left;
+            justify-content: center;
+            max-width: 50%;
+            overflow: hidden;
+        }
+
+        .logo-container {
+            flex: 1;
+            display: flex;
+            justify-content: right;
+            align-items: right;
+            max-width: 50%;
+            overflow: hidden;
+        }
+
+        .logo img {
+            width: 100%; 
+            height: auto;
+            display: block;
+            border-radius: 10px;
+            object-fit: cover; 
+        }
+
+        #video-container {
+            position: relative;
+            overflow: hidden;
+            border-radius: 20px;
+            margin-bottom: 10px; 
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.15);
+            width: 100%;
+            height: auto;
+        }
+
+        #video {
+            width: 100%;
+            height: auto;
+            display: block;
+            border-radius: 20px;
+        }
+
+        #scanButton {
+            background: linear-gradient(45deg, #FFC107, #FF7043);
+            color: white;
+            border: none;
+            padding: 10px 20px; 
+            border-radius: 25px; 
+            cursor: pointer;
+            transition: all 0.3s ease;
+            font-size: 16px; 
+            width: 100%;
+            font-weight: bold;
+            text-transform: uppercase;
+            letter-spacing: 1px; 
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.15);
+        }
+
+        #scanButton:hover {
+            transform: translateY(-1px); 
+            box-shadow: 0 6px 12px rgba(0, 0, 0, 0.25);
+        }
+
+        #participantInfo, #serviceButtons, #output {
+            margin-top: 10px; 
+        }
+
+        #participantInfo {
+            background-color: #FFE0B2;
+            padding: 10px; 
+            border-radius: 10px;
+            box-shadow: inset 0 2px 4px rgba(0, 0, 0, 0.15);
+            font-family: 'Julius Sans One', sans-serif;
+            font-size: 14px; 
+        }
+
+        .service-button {
+            background: linear-gradient(45deg, #81C784, #66BB6A);
+            color: white;
+            border: none;
+            padding: 10px 20px; 
+            border-radius: 25px; 
+            cursor: pointer;
+            transition: all 0.3s ease;
+            font-size: 16px; 
+            margin: 5px; 
+            font-weight: bold;
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.15);
+        }
+
+        .service-button:hover {
+            transform: translateY(-1px); 
+            box-shadow: 0 6px 12px rgba(0, 0, 0, 0.25);
+        }
+
+        .success {
+            color: #43A047;
+            font-weight: bold;
+        }
+
+        .error {
+            color: #D32F2F;
+            font-weight: bold;
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(-10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        .fade-in {
+            animation: fadeIn 0.5s ease-out;
+        }
+    </style>
+</head>
+<body>
+    <div class="wrapper">
+        <div class="scanner-container">
+            <div id="video-container">
+                <video id="video" autoplay playsinline></video>
+            </div>
+            <button id="scanButton" onclick="scanQRCode()">
+                <i class="fas fa-camera"></i> Scan QR Code
+            </button>
+            <div id="participantInfo" style="display: none;"></div>
+            <div id="serviceButtons" style="display: none;">
+                <button class="service-button" onclick="selectService('sadhya')">
+                    <i class="fas fa-utensils"></i> Sadhya
+                </button>
+            </div>
+            <div id="output"></div>
+        </div>
+        <div class="logo-container">
+            <div class="logo">
+                <img src="images/aavesham.png" alt="Aavesham'24 Logo">
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const video = document.getElementById('video');
+        const canvas = document.createElement('canvas');
+        const ctx = canvas.getContext('2d');
+        const output = document.getElementById('output');
+        const participantInfo = document.getElementById('participantInfo');
+        const serviceButtons = document.getElementById('serviceButtons');
+        let scannedQRCode = null;
+
+        navigator.mediaDevices.getUserMedia({ video: { facingMode: "environment" } })
+            .then(function(stream) {
+                video.srcObject = stream;
+                video.setAttribute("playsinline", true);
+                video.play();
+            })
+            .catch(function(err) {
+                console.error("An error occurred: " + err);
+                showMessage("Camera access error: " + err, 'error');
+            });
+
+        function scanQRCode() {
+            canvas.width = video.videoWidth;
+            canvas.height = video.videoHeight;
+            ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+            var imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+            var code = jsQR(imageData.data, imageData.width, imageData.height, {
+                inversionAttempts: "dontInvert",
+            });
+            if (code) {
+                console.log("Found QR code", code.data);
+                scannedQRCode = code.data;
+                getParticipantInfo(scannedQRCode);
+            } else {
+                showMessage("No QR code found. Please try again.", 'error');
+                hideElements([participantInfo, serviceButtons]);
+            }
+        }
+
+        function getParticipantInfo(uniqueId) {
+            showMessage("Fetching participant info...", '');
+            fetch('/scan', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ unique_id: uniqueId, action: 'get_info' }),
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    participantInfo.innerHTML = `
+                        <p><strong>Name:</strong> ${data.name}</p>
+                        <p><strong>Phone:</strong> ${data.phone_number}</p>
+                    `;
+                    showElements([participantInfo, serviceButtons]);
+                    output.textContent = "";
+                } else {
+                    showMessage(data.message, 'error');
+                    hideElements([participantInfo, serviceButtons]);
+                }
+            })
+            .catch((error) => {
+                console.error('Error:', error);
+                showMessage('Error occurred while fetching participant info', 'error');
+            });
+        }
+
+        function selectService(service) {
+            if (scannedQRCode) {
+                sendToServer(scannedQRCode, service);
+            } else {
+                showMessage("Please scan a QR code first.", 'error');
+            }
+        }
+
+        function sendToServer(uniqueId, service) {
+            showMessage('Processing...', '');
+            fetch('/scan', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ unique_id: uniqueId, action: 'use_service', service: service }),
+            })
+            .then(response => response.json())
+            .then(data => {
+                showMessage(data.message, data.success ? 'success' : 'error');
+                if (data.success) {
+                    scannedQRCode = null;
+                    hideElements([serviceButtons, participantInfo]);
+                }
+            })
+            .catch((error) => {
+                console.error('Error:', error);
+                showMessage('Error occurred while processing', 'error');
+            });
+        }
+
+        function showMessage(message, type) {
+            output.textContent = message;
+            output.className = `${type} fade-in`;
+        }
+
+        function showElements(elements) {
+            elements.forEach(el => {
+                el.style.display = 'block';
+                el.classList.add('fade-in');
+            });
+        }
+
+        function hideElements(elements) {
+            elements.forEach(el => {
+                el.style.display = 'none';
+                el.classList.remove('fade-in');
+            });
+        }
+    </script>
+</body>
+</html>
