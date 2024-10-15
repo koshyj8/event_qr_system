@@ -17,7 +17,7 @@ if creds and creds.expired and creds.refresh_token:
 
 client = gspread.authorize(creds)
 
-sheet = client.open('ONAM24 SADHYA REGISTRATION (Responses)').sheet1
+sheet = client.open('Onam Celebration Data').sheet1
 
 @app.route('/')
 def index():    
@@ -55,12 +55,19 @@ def scan():
         if action == 'get_info':
             phone = sheet.cell(row, headers.index("Phone Number") + 1).value
             sadhya_used = sheet.cell(row, sadhya_used_col).value
+            idnum = sheet.cell(row, headers.index("ID No.") + 1).value
+            enrollmentno = sheet.cell(row, headers.index("Enrollment No.") + 1).value
+            
 
             return jsonify({
                 'success': True,
                 'name': name,
                 'phone_number': phone,
                 'sadhya_used': sadhya_used,
+                'id': idnum,
+                'enrollment_no': enrollmentno,
+                'row_no' : row - 1
+                
 
             }), 200
         

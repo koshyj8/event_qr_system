@@ -13,6 +13,7 @@ from email import encoders
 import traceback
 import random
 import string
+import time
 
 load_dotenv()
 
@@ -68,8 +69,8 @@ def send_email(to_email, qr_filename, id, name, phone, enrollment_no, serial_cod
                 <div class="offers">
                     <p><strong>Special Discounts & Offers:</strong></p>
                     <ul>
-                        <li>Show your unique Aarohi Serial Number during Aarohi registration to avail 20% discount on Tickets.</li>
-                        <li>Don't forget to collect your coupons for exclusive discounts and offers at Anna Idli, Cluckers, Giani Ice Cream, and TumbleDry from the Sadhya counter on 22nd September 2024.</li>
+                        <li>Show your unique Aarohi Serial Number during Aarohi registration to avail 10% discount on Tickets.</li>
+                        <li>Don't forget to collect your coupons for exclusive discounts and offers at Anna Idli, Cluckers, and Giani Ice Cream from the Sadhya counter on 22nd September 2024.</li>
                     </ul>
                 </div>
                 <p class="footer">
@@ -116,6 +117,8 @@ def send_email(to_email, qr_filename, id, name, phone, enrollment_no, serial_cod
         print("Traceback:")
         print(traceback.format_exc())
 
+
+
 SCOPES = ['https://www.googleapis.com/auth/spreadsheets', 'https://www.googleapis.com/auth/drive']
 creds = Credentials.from_service_account_file('credentials.json', scopes=SCOPES)
 
@@ -125,61 +128,87 @@ if creds and creds.expired and creds.refresh_token:
 client = gspread.authorize(creds)
 sheet = client.open('Onam Celebration Data').sheet1
 
-records = sheet.get_all_records(expected_headers = ["Unique ID", "Sadhya Used", "Serial Code", "Name", "ID No.", "Enrollment No.", "Phone Number", "Email"])
-print(f"Retrieved {len(records)} records from the sheet.")
-headers = sheet.row_values(1)
-first_empty_col = len(headers) + 1
-if not os.path.exists('qr_codes'):
-    os.makedirs('qr_codes')
+def fetch_all_data():
+    records = sheet.get_all_records(expected_headers = ["Unique ID", "Sadhya Used", "Serial Code", "Name", "ID No.", "Enrollment No.", "Phone Number", "Email"])
+    return records
 
-required_columns = ["Unique ID", "Sadhya Used", "Serial Code"]
-for col in required_columns:
-    if col not in headers:
-        sheet.update_cell(1, first_empty_col, col)
-        headers.append(col)
-        first_empty_col += 1
+def batch_update(updates):
+    sheet.batch_update(updates)
 
-n = int(input("Enter no. of records to process: "))
-processed_count = 0
+def exponential_backoff(func, max_retries=5):
+    for n in range(max_retries):
+        try:
+            return func()
+        except gspread.exceptions.APIError as e:
+            if e.response.status_code == 429:
+                time.sleep((2 ** n) + random.random())
+            else:
+                raise
+    raise Exception("Max retries exceeded")
 
-unique_id_column = headers.index("Unique ID") + 1
-serial_code_column = headers.index("Serial Code") + 1
-unique_ids = sheet.col_values(unique_id_column)
-last_processed_row = max(i for i, unique_id in enumerate(unique_ids) if unique_id != "") + 1
-
-for row in range(last_processed_row + 1, sheet.row_count + 1):
-    if processed_count >= n:
-        break
-    
+def get_column_index(header_name):
+    headers = sheet.row_values(1)
     try:
-        record = {header: sheet.cell(row, headers.index(header) + 1).value for header in headers}
-        print(f"Processing record: {record}")
-        
-        id_no = str(record['ID No.'])
-        print(f"ID No.: {id_no}")
-        
-        unique_id_cell = sheet.cell(row, unique_id_column)
-        unique_id = unique_id_cell.value
-        
-        if unique_id:
-            print(f"Record with ID No. {id_no} already exists with Unique ID {unique_id}. Skipping.")
-        elif id_no == '':
-            print('Empty ID No. Skipping.')
-        else:
-            unique_id = str(uuid.uuid4())
-            qr_data = unique_id
-            qr_filename = f"qr_codes/{id_no}.png"
-            generate_qr_code(qr_data, qr_filename)            
-            serial_code = generate_serial_code()
-            send_email(record['Email'], qr_filename, id_no, record['Name'], record['Phone Number'], record['Enrollment No.'], serial_code)
-            sheet.update_cell(row, unique_id_column, unique_id)
-            sheet.update_cell(row, serial_code_column, serial_code)
-            sheet.update_cell(row, headers.index("Sadhya Used") + 1, "FALSE")            
-            processed_count += 1        
-    except Exception as e:
-        print(f"Error processing record in row {row}: {str(e)}")
-        print("Traceback:")
-        print(traceback.format_exc())
-        continue
-    
-print(f"Processed {processed_count} records.")
+        return headers.index(header_name) + 1
+    except ValueError:
+        print(f"Header '{header_name}' not found. Adding it to the sheet.")
+        next_column = len(headers) + 1
+        sheet.update_cell(1, next_column, header_name)
+        return next_column
+
+def main():
+    if not os.path.exists('qr_codes'):
+        os.makedirs('qr_codes')
+
+    records = exponential_backoff(fetch_all_data)
+    print(f"Retrieved {len(records)} records from the sheet.")
+
+    # Get correct column indices
+    unique_id_col = get_column_index("Unique ID")
+    sadhya_used_col = get_column_index("Sadhya Used")
+    serial_code_col = get_column_index("Serial Code")
+
+    n = int(input("Enter no. of records to process: "))
+    processed_count = 0
+    updates = []
+
+    for idx, record in enumerate(records, start=2):  # start=2 because sheet is 1-indexed and we have a header row
+        if processed_count >= n:
+            break
+
+        try:
+            id_no = str(record.get('ID No.', ''))
+            unique_id = record.get('Unique ID', '')
+
+            if unique_id:
+                print(f"Record with ID No. {id_no} already exists with Unique ID {unique_id}. Skipping.")
+            elif id_no == '':
+                print('Empty ID No. Skipping.')
+            else:
+                unique_id = str(uuid.uuid4())
+                qr_filename = f"qr_codes/{id_no}.png"
+                generate_qr_code(unique_id, qr_filename)
+                serial_code = generate_serial_code()
+                send_email(record['Email'], qr_filename, id_no, record['Name'], record['Phone Number'], record['Enrollment No.'], serial_code)
+
+                updates.extend([
+                    {'range': f'{gspread.utils.rowcol_to_a1(idx, unique_id_col)}', 'values': [[unique_id]]},
+                    {'range': f'{gspread.utils.rowcol_to_a1(idx, sadhya_used_col)}', 'values': [['FALSE']]},
+                    {'range': f'{gspread.utils.rowcol_to_a1(idx, serial_code_col)}', 'values': [[serial_code]]}
+                ])
+
+                processed_count += 1
+
+        except Exception as e:
+            print(f"Error processing record: {str(e)}")
+            print("Traceback:")
+            print(traceback.format_exc())
+            continue
+
+    if updates:
+        exponential_backoff(lambda: batch_update(updates))
+
+    print(f"Processed {processed_count} records.")
+
+if __name__ == "__main__":
+    main()
